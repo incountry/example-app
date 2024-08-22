@@ -6,17 +6,23 @@
     <p id="result"></p>
 
     <script type="text/javascript">
-        const fetchAllRecords = () => fetch('/contacts', { headers: { 'Content-Type': 'application/json' } });
+        const BORDER_URL = '<%= BORDER_URL %>';
+
+        const headers = {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': true
+        };
+        const fetchAllRecords = () => fetch(`${BORDER_URL}/contacts`, { headers });
 
         const createOrUpdateBackendRecord = (payload, url, method) => fetch(url, {
             body: JSON.stringify(payload),
             method,
-            headers: { 'Content-Type': 'application/json' },
+            headers,
         });
 
         const deleteBackendRecord = (url) => fetch(url, {
             method: "DELETE",
-            headers: { 'Content-Type': 'application/json' },
+            headers,
         });
 
         const submitForm = async (form) => {
@@ -29,7 +35,7 @@
             const res = await createOrUpdateBackendRecord(formDataJSON, form.getAttribute('action'), form.getAttribute('method'));
             const resBody = await res.json();
             const { id } = resBody;
-            form.setAttribute('action', `/contacts/${id}`);
+            form.setAttribute('action', `${BORDER_URL}/contacts/${id}`);
             form.setAttribute('method', 'PATCH');
             form.querySelector('button[name="delete"]').setAttribute("id", id);
             document.getElementById('result').innerHTML = `
@@ -43,9 +49,11 @@
 
         const addContactForm = ({ id, first_name, last_name, phone, email, company_name, department } = { id: '' }) => {
             const newForm = document.createElement('form');
-            newForm.setAttribute('action', `/contacts/${id}`);
+            newForm.setAttribute('action', `${BORDER_URL}/contacts/${id}`);
             newForm.setAttribute('method', id ? 'PATCH' : 'POST');
             newForm.innerHTML = `
+                <input name="id" value="${id || ''}" hidden />
+
                 <label> First Name:</label >
                 <input name="first_name" value="${first_name || ''}" />
 

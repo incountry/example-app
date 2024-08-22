@@ -1,19 +1,31 @@
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-
-let idAutoincrement = 1;
+import { v4 as uuidv4 } from 'uuid';
 
 const contactsDB = {};
 
 const app = express();
-const port = process.env.NODE_PORT;
+const {
+  BORDER_URL, NODE_PORT: port = 3000,
+} = process.env;
+
+if (!BORDER_URL) {
+  console.log('Missing one of the required ENV variables. BORDER_URL is required');
+  process.exit(1);
+}
 
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static('public'));
+app.set('view engine', 'ejs');
 
-app.get('/contacts', async (req, res) => res.json(Object.values(contactsDB)));
+app.get('/', async (req, res) => {
+  res.render('index', { BORDER_URL });
+});
+
+app.get('/contacts', async (req, res) => {
+  res.json(Object.values(contactsDB));
+});
 
 app.get('/contacts/:id', async (req, res) => {
   if (req.params.id in contactsDB) {
@@ -23,9 +35,9 @@ app.get('/contacts/:id', async (req, res) => {
 });
 
 app.post('/contacts', async (req, res) => {
-  contactsDB[idAutoincrement] = { ...req.body, id: idAutoincrement };
-  res.json(contactsDB[idAutoincrement]);
-  idAutoincrement += 1;
+  const id = uuidv4();
+  contactsDB[id] = { ...req.body, id };
+  res.json(contactsDB[id]);
 });
 
 app.patch('/contacts/:id', async (req, res) => {
