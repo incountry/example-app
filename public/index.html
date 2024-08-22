@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+
+<body>
+    <div id="contacts_list"></div>
+    <button id="add_contact" onclick="addContactForm();">+</button>
+    <p id="result"></p>
+
+    <script type="text/javascript">
+        const fetchAllRecords = () => fetch('/contacts', { headers: { 'Content-Type': 'application/json' } });
+
+        const createOrUpdateBackendRecord = (payload, url, method) => fetch(url, {
+            body: JSON.stringify(payload),
+            method,
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        const deleteBackendRecord = (url) => fetch(url, {
+            method: "DELETE",
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        const submitForm = async (form) => {
+            const formData = new FormData(form);
+            const formDataJSON = {};
+            for (const [key, value] of formData) {
+                formDataJSON[key] = value;
+            }
+
+            const res = await createOrUpdateBackendRecord(formDataJSON, form.getAttribute('action'), form.getAttribute('method'));
+            const resBody = await res.json();
+            const { id } = resBody;
+            form.setAttribute('action', `/contacts/${id}`);
+            form.setAttribute('method', 'PATCH');
+            form.querySelector('button[name="delete"]').setAttribute("id", id);
+            document.getElementById('result').innerHTML = `
+                Saved to backend: ${JSON.stringify(formDataJSON)}
+                <br />
+                Response from backend: ${JSON.stringify(resBody)}
+            `;
+
+            return false;
+        };
+
+        const addContactForm = ({ id, first_name, last_name, phone, email, company_name, department } = { id: '' }) => {
+            const newForm = document.createElement('form');
+            newForm.setAttribute('action', `/contacts/${id}`);
+            newForm.setAttribute('method', id ? 'PATCH' : 'POST');
+            newForm.innerHTML = `
+                <label> First Name:</label >
+                <input name="first_name" value="${first_name || ''}" />
+
+                <label>Last Name:</label>
+                <input name="last_name" value="${last_name || ''}" />
+
+                <label>Email:</label>
+                <input name="email" value="${email || ''}" />
+
+                <label>Phone:</label>
+                <input name="phone" value="${phone || ''}" />
+
+                <label>Company name:</label>
+                <input name="company_name" value="${company_name || ''}" />
+
+                <label>Deparment:</label>
+                <input name="department" value="${department || ''}" />
+
+                <button type="submit">Save</button>
+                <button name="delete" type="button" id="${id || ''}">Delete</button>
+            `;
+            document.getElementById('contacts_list').append(newForm)
+        }
+
+        const start = async () => {
+            const res = await fetchAllRecords();
+            const contacts = await res.json();
+            for (let c of contacts) {
+                addContactForm(c);
+            }
+        }
+
+        document.getElementsByTagName('body')[0].addEventListener('submit', async function (e) {
+            e.preventDefault();
+            submitForm(e.target);
+            return false;
+        }, false);
+
+        document.getElementsByTagName('body')[0].addEventListener('click', async function (e) {
+            if (e.target && e.target.getAttribute('name') === 'delete') {
+                e.preventDefault();
+                const id = e.target.getAttribute('id');
+                if (id) {
+                    const res = await deleteBackendRecord(e.target.parentNode.getAttribute("action"));
+                    const resBody = await res.json();
+                    document.getElementById('result').innerHTML = `
+                    Response from backend: HTTP ${JSON.stringify(resBody)}
+                `;
+                }
+                e.target.parentNode.remove();
+            }
+        }, false);
+
+        start();
+    </script>
+</body>

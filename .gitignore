@@ -1,6 +1,7 @@
 **/node_modules
 **/.env
-.vs_code
+.vscode
 .git
+**/package-lock.json
 
 
