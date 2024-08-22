@@ -6,7 +6,17 @@
     <p id="result"></p>
 
     <script type="text/javascript">
+        const RESTAPI_URL = '<%= RESTAPI_URL %>';
+
+        const getToken = () => fetch(`/get_token`, { method: 'POST' });
+
         const fetchAllRecords = () => fetch('/contacts', { headers: { 'Content-Type': 'application/json' } });
+
+        const createRestAPIRecord = ({ primary_key, first_name, last_name }, token) => fetch(`${RESTAPI_URL}/api/models/users`, {
+            body: JSON.stringify({ primary_key, first_name, last_name }),
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        });
 
         const createOrUpdateBackendRecord = (payload, url, method) => fetch(url, {
             body: JSON.stringify(payload),
@@ -25,17 +35,23 @@
             for (const [key, value] of formData) {
                 formDataJSON[key] = value;
             }
+            formDataJSON.primary_key = "somth";
 
-            const res = await createOrUpdateBackendRecord(formDataJSON, form.getAttribute('action'), form.getAttribute('method'));
+            const tokenResponse = await getToken();
+            const { access_token } = await tokenResponse.json();
+            const res = await createRestAPIRecord(formDataJSON, access_token);
             const resBody = await res.json();
             const { id } = resBody;
+
+            await createOrUpdateBackendRecord(resBody, form.getAttribute('action'), form.getAttribute('method'));
+
             form.setAttribute('action', `/contacts/${id}`);
             form.setAttribute('method', 'PATCH');
             form.querySelector('button[name="delete"]').setAttribute("id", id);
             document.getElementById('result').innerHTML = `
-                Saved to backend: ${JSON.stringify(formDataJSON)}
+                Saved to RestAPI: ${JSON.stringify(formDataJSON)}
                 <br />
-                Response from backend: ${JSON.stringify(resBody)}
+                Saved to backend: ${JSON.stringify(resBody)}
             `;
 
             return false;
