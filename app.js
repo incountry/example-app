@@ -7,13 +7,8 @@ const contactsDB = {};
 
 const app = express();
 const {
-  BORDER_URL, NODE_PORT: port = 3000,
+  NODE_PORT: port = 3000,
 } = process.env;
-
-if (!BORDER_URL) {
-  console.log('Missing one of the required ENV variables. BORDER_URL is required');
-  process.exit(1);
-}
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -21,7 +16,7 @@ app.use(express.static('public'));
 app.set('view engine', 'ejs');
 
 app.get('/', async (req, res) => {
-  res.render('index', { BORDER_URL });
+  res.render('index');
 });
 
 app.get('/contacts', async (req, res) => {
