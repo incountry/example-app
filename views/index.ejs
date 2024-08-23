@@ -1,28 +1,77 @@
 <!DOCTYPE html>
 
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css"
+        integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <style type="text/css">
+        #contacts_list {
+            margin-top: 200px;
+        }
+
+        .flex-container-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .contact-row {
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+
 <body>
-    <div id="contacts_list"></div>
-    <button id="add_contact" onclick="addContactForm();">+</button>
-    <p id="result"></p>
+    <div id="contacts_list" class="container-fluid flex-container-center"></div>
+    <div id="add_contact_container" class="container flex-container-center contact-row">
+        <button id="add_contact" class="btn" onclick="addContactForm();">Add Contact</button>
+    </div>
+    <div id="result" class="container">
+    </div>
 
     <script type="text/javascript">
+        let _token = null;
+
         const RESTAPI_URL = '<%= RESTAPI_URL %>';
 
-        const getToken = () => fetch(`/get_token`, { method: 'POST' });
+        const getToken = async () => {
+            if (_token) {
+                return _token.access_token;
+            }
+            const tokenResponse = await fetch(`/get_token`, { method: 'POST' });
+            const tokenData = await tokenResponse.json();
+            _token = tokenData;
+            return _token.access_token;
+        }
 
         const fetchAllRecords = () => fetch('/contacts', { headers: { 'Content-Type': 'application/json' } });
 
-        const createRestAPIRecord = ({ primary_key, first_name, last_name }, token) => fetch(`${RESTAPI_URL}/api/models/users`, {
-            body: JSON.stringify({ primary_key, first_name, last_name }),
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        });
+        const createRestAPIRecord = async (payload) => {
+            const token = await getToken();
+            const res = await fetch(`${RESTAPI_URL}/api/models/users`, {
+                body: JSON.stringify(payload),
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            })
+            return res.json();
+        };
 
-        const createOrUpdateBackendRecord = (payload, url, method) => fetch(url, {
-            body: JSON.stringify(payload),
-            method,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        const deleteAPIRecord = async (primary_key) => {
+            const token = await getToken();
+            return fetch(`${RESTAPI_URL}/api/models/users/${primary_key}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            });
+        }
+
+        const createOrUpdateBackendRecord = async (payload, url, method) => {
+            const res = await fetch(url, {
+                body: JSON.stringify(payload),
+                method,
+                headers: { 'Content-Type': 'application/json' },
+            })
+            return res.json();
+        };
 
         const deleteBackendRecord = (url) => fetch(url, {
             method: "DELETE",
@@ -35,53 +84,97 @@
             for (const [key, value] of formData) {
                 formDataJSON[key] = value;
             }
-            formDataJSON.primary_key = "somth";
+            if (!formDataJSON.id) {
+                delete formDataJSON.id;
+            }
+            const dataToSendToRestApi = {
+                primary_key: formDataJSON.email,
+                first_name: formDataJSON.first_name,
+                last_name: formDataJSON.last_name,
+                phone: formDataJSON.phone,
+                email: formDataJSON.email,
+            }
 
-            const tokenResponse = await getToken();
-            const { access_token } = await tokenResponse.json();
-            const res = await createRestAPIRecord(formDataJSON, access_token);
-            const resBody = await res.json();
-            const { id } = resBody;
+            const restapiRes = await createRestAPIRecord(dataToSendToRestApi);
+            const { primary_key, first_name, last_name, phone, email } = restapiRes;
 
-            await createOrUpdateBackendRecord(resBody, form.getAttribute('action'), form.getAttribute('method'));
+            const resultRecord = {
+                ...formDataJSON,
+                first_name,
+                last_name,
+                phone,
+                email,
+            }
 
-            form.setAttribute('action', `/contacts/${id}`);
+            const backendResponse = await createOrUpdateBackendRecord(resultRecord, form.getAttribute('action'), form.getAttribute('method'));
+
+            form.setAttribute('action', `/contacts/${backendResponse.id}`);
             form.setAttribute('method', 'PATCH');
-            form.querySelector('button[name="delete"]').setAttribute("id", id);
+            form.querySelector('button[name="delete"]').setAttribute("id", backendResponse.id);
             document.getElementById('result').innerHTML = `
-                Saved to RestAPI: ${JSON.stringify(formDataJSON)}
-                <br />
-                Saved to backend: ${JSON.stringify(resBody)}
+                <div class="row">
+                    <div class="col-md-4">
+                        Saved to RestAPI:
+                        <pre>${JSON.stringify(dataToSendToRestApi, null, 2)}</pre>
+                    </div>
+                    <div class="col-md-4">
+                        Response from RestAPI:
+                        <pre>${JSON.stringify(restapiRes, null, 2)}</pre>
+                    </div>
+                    <div class="col-md-4">
+                        Saved on backend:
+                        <pre>${JSON.stringify(backendResponse, null, 2)}</pre>
+                    </div>
+                </div>
             `;
 
             return false;
         };
 
         const addContactForm = ({ id, first_name, last_name, phone, email, company_name, department } = { id: '' }) => {
-            const newForm = document.createElement('form');
-            newForm.setAttribute('action', `/contacts/${id}`);
-            newForm.setAttribute('method', id ? 'PATCH' : 'POST');
+            const newForm = document.createElement('div');
             newForm.innerHTML = `
-                <label> First Name:</label >
-                <input name="first_name" value="${first_name || ''}" />
+                <div class="row contact-row">
+                    <div class="col-md-12">
+                        <form method="${id ? 'PATCH' : 'POST'}" action="/contacts/${id}" class="form-inline">
+                            <input name="id" value="${id || ''}" hidden />
+                            <div class="form-group">
+                                <label> First Name:</label >
+                                <input name="first_name" class="form-control" value="${first_name || ''}" />
+                            </div>
 
-                <label>Last Name:</label>
-                <input name="last_name" value="${last_name || ''}" />
+                            <div class="form-group">
+                                <label>Last Name:</label>
+                                <input name="last_name" class="form-control" value="${last_name || ''}" />
+                            </div>
 
-                <label>Email:</label>
-                <input name="email" value="${email || ''}" />
+                            <div class="form-group">
+                                <label>Email (primary key):</label>
+                                <input name="email" class="form-control" required value="${email || ''}" />
+                            </div>
 
-                <label>Phone:</label>
-                <input name="phone" value="${phone || ''}" />
+                            <div class="form-group">
+                                <label>Phone:</label>
+                                <input name="phone" class="form-control" value="${phone || ''}" />
+                            </div>
 
-                <label>Company name:</label>
-                <input name="company_name" value="${company_name || ''}" />
+                            <div class="form-group">
+                                <label>Company name:</label>
+                                <input name="company_name" class="form-control" value="${company_name || ''}" />
+                            </div>
 
-                <label>Deparment:</label>
-                <input name="department" value="${department || ''}" />
+                            <div class="form-group">
+                                <label>Deparment:</label>
+                                <input name="department" class="form-control" value="${department || ''}" />
+                            </div>
 
-                <button type="submit">Save</button>
-                <button name="delete" type="button" id="${id || ''}">Delete</button>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-default">Save</button>
+                                <button name="delete" class="btn btn-danger" type="button" id="${id || ''}">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             `;
             document.getElementById('contacts_list').append(newForm)
         }
@@ -105,13 +198,21 @@
                 e.preventDefault();
                 const id = e.target.getAttribute('id');
                 if (id) {
-                    const res = await deleteBackendRecord(e.target.parentNode.getAttribute("action"));
+                    const form = e.target.closest('form');
+                    const recordPK = form.querySelector('input[name="email"]').value;
+                    await deleteAPIRecord(recordPK)
+                    const res = await deleteBackendRecord(form.getAttribute('action'));
                     const resBody = await res.json();
+                    form.remove();
                     document.getElementById('result').innerHTML = `
-                    Response from backend: HTTP ${JSON.stringify(resBody)}
-                `;
+                        <div class="row">
+                            <div class="col-md-6">
+                                Response from backend:
+                                <pre>${JSON.stringify(resBody, null, 2)}</pre>
+                            </div>
+                        </div>
+                    `;
                 }
-                e.target.parentNode.remove();
             }
         }, false);
 
