@@ -17,6 +17,7 @@ if (!BORDER_URL) {
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.static('public'));
 app.set('view engine', 'ejs');
 
 app.get('/', async (req, res) => {
