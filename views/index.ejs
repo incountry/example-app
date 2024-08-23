@@ -55,6 +55,9 @@
             for (const [key, value] of formData) {
                 formDataJSON[key] = value;
             }
+            if (!formDataJSON.id) {
+                delete formDataJSON.id;
+            }
 
             const res = await createOrUpdateBackendRecord(formDataJSON, form.getAttribute('action'), form.getAttribute('method'));
             const resBody = await res.json();
@@ -146,13 +149,19 @@
                 e.preventDefault();
                 const id = e.target.getAttribute('id');
                 if (id) {
-                    const res = await deleteBackendRecord(e.target.parentNode.getAttribute("action"));
+                    const form = e.target.closest('form');
+                    const res = await deleteBackendRecord(form.getAttribute('action'));
                     const resBody = await res.json();
+                    form.remove();
                     document.getElementById('result').innerHTML = `
-                    Response from backend: HTTP ${JSON.stringify(resBody)}
-                `;
+                        <div class="row">
+                            <div class="col-md-6">
+                                Response from backend:
+                                <pre>${JSON.stringify(resBody, null, 2)}</pre>
+                            </div>
+                        </div>
+                    `;
                 }
-                e.target.parentNode.remove();
             }
         }, false);
 
